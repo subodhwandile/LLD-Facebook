@@ -32,13 +32,13 @@ void convertNV21toNV12InPlace(uint8_t* nv21, int width, int height) {
     int uvSize = ySize / 2;
 
     // Log the Y and UV planes before conversion
-    LOGD("Before Conversion - Y Plane (first 10 values):");
-    for (int i = 0; i < 10; i++) {
+    LOGD("Before Conversion - Y Plane (first %d values):", std::min(10, ySize));
+    for (int i = 0; i < std::min(10, ySize); i++) {
         LOGD("%d ", nv21[i]);
     }
 
-    LOGD("Before Conversion - UV Plane (first 10 values):");
-    for (int i = ySize; i < ySize + 10; i++) {
+    LOGD("Before Conversion - UV Plane (first %d values):", std::min(10, uvSize * 2));
+    for (int i = ySize; i < ySize + std::min(10, uvSize * 2); i++) {
         LOGD("%d ", nv21[i]);
     }
 
@@ -50,13 +50,13 @@ void convertNV21toNV12InPlace(uint8_t* nv21, int width, int height) {
     }
 
     // Log the Y and UV planes after conversion
-    LOGD("After Conversion - Y Plane (first 10 values):");
-    for (int i = 0; i < 10; i++) {
+    LOGD("After Conversion - Y Plane (first %d values):", std::min(10, ySize));
+    for (int i = 0; i < std::min(10, ySize); i++) {
         LOGD("%d ", nv21[i]);
     }
 
-    LOGD("After Conversion - UV Plane (first 10 values):");
-    for (int i = ySize; i < ySize + 10; i++) {
+    LOGD("After Conversion - UV Plane (first %d values):", std::min(10, uvSize * 2));
+    for (int i = ySize; i < ySize + std::min(10, uvSize * 2); i++) {
         LOGD("%d ", nv21[i]);
     }
 }
