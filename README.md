@@ -27,16 +27,36 @@ Extended Requirement: Write a function to find connection suggestion for a membe
 
 
 
-void convertNV21toNV12(const uint8_t* nv21, uint8_t* nv12, int width, int height) {
+void convertNV21toNV12InPlace(uint8_t* nv21, int width, int height) {
     int ySize = width * height;
     int uvSize = ySize / 2;
 
-    // Copy the Y plane (same in both formats)
-    memcpy(nv12, nv21, ySize);
+    // Log the Y and UV planes before conversion
+    LOGD("Before Conversion - Y Plane (first 10 values):");
+    for (int i = 0; i < 10; i++) {
+        LOGD("%d ", nv21[i]);
+    }
+
+    LOGD("Before Conversion - UV Plane (first 10 values):");
+    for (int i = ySize; i < ySize + 10; i++) {
+        LOGD("%d ", nv21[i]);
+    }
 
     // Swap U and V components in the interleaved plane
     for (int i = 0; i < uvSize; i += 2) {
-        nv12[ySize + i] = nv21[ySize + i + 1]; // U in NV12 = V in NV21
-        nv12[ySize + i + 1] = nv21[ySize + i]; // V in NV12 = U in NV21
+        uint8_t temp = nv21[ySize + i]; // U component in NV21
+        nv21[ySize + i] = nv21[ySize + i + 1]; // U in NV12 = V in NV21
+        nv21[ySize + i + 1] = temp; // V in NV12 = U in NV21
+    }
+
+    // Log the Y and UV planes after conversion
+    LOGD("After Conversion - Y Plane (first 10 values):");
+    for (int i = 0; i < 10; i++) {
+        LOGD("%d ", nv21[i]);
+    }
+
+    LOGD("After Conversion - UV Plane (first 10 values):");
+    for (int i = ySize; i < ySize + 10; i++) {
+        LOGD("%d ", nv21[i]);
     }
 }
