@@ -59,25 +59,38 @@ Java_com_example_yourapp_NativeUtils_convertNV21ToNV12(JNIEnv* env, jobject thiz
         return;
     }
 
-    // Lock buffer for CPU access
-    void* mappedMemory = nullptr;
-    if (AHardwareBuffer_lock(buffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN, -1, nullptr, &mappedMemory) != 0) {
+    // Lock the YUV buffer
+    AHardwareBuffer_Planes planes;
+    if (AHardwareBuffer_lockYCbCr(buffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN, -1, nullptr, &planes) != 0) {
         LOGE("Failed to lock AHardwareBuffer");
         return;
     }
 
-    uint8_t* data = static_cast<uint8_t*>(mappedMemory);
-    int frameSize = desc.width * desc.height;
+    uint8_t* yPlane = static_cast<uint8_t*>(planes.ycbcr.y);
+    uint8_t* uvPlane = static_cast<uint8_t*>(planes.ycbcr.cb);
+    uint32_t yStride = planes.ycbcr.ystride;
+    uint32_t uvStride = planes.ycbcr.cstride;
+    uint32_t chromaStep = planes.ycbcr.chroma_step;
 
-    uint8_t* yPlane = data;
-    uint8_t* uvPlane = data + frameSize;  // NV21: Y followed by VU plane
-
-    // Convert NV21 (YVU) to NV12 (YUV) in-place
-    for (int i = 0; i < frameSize / 2; i += 2) {
-        std::swap(uvPlane[i], uvPlane[i + 1]);  // Swap V and U
+    if (chromaStep != 2) {
+        LOGE("Unexpected chroma step: %d. Expected 2 for NV21/NV12.", chromaStep);
+        AHardwareBuffer_unlock(buffer, nullptr);
+        return;
     }
 
-    // Unlock buffer
+    int uvHeight = desc.height / 2;
+    int uvWidth = desc.width / 2;
+
+    // Convert NV21 to NV12 (Swap U and V)
+    for (int row = 0; row < uvHeight; ++row) {
+        for (int col = 0; col < uvWidth; ++col) {
+            uint8_t* vuPair = uvPlane + row * uvStride + col * 2;
+            std::swap(vuPair[0], vuPair[1]);  // Swap V (NV21) to U (NV12)
+        }
+    }
+
+    // Unlock buffer after modification
     AHardwareBuffer_unlock(buffer, nullptr);
 }
+
 
