@@ -26,37 +26,21 @@ or connection invitation or a comment on their post.
 Extended Requirement: Write a function to find connection suggestion for a member.
 
 
+void convertNV21toNV12(uint8_t* dst_y, int dst_stride_y,
+                       uint8_t* dst_vu, int dst_stride_vu,
+                       int width, int height) {
+    // Y plane is already in the correct format, so no changes are needed.
 
-void convertNV21toNV12InPlace(uint8_t* nv21, int width, int height) {
-    int ySize = width * height;
-    int uvSize = ySize / 2;
+    // Process the VU plane (swap U and V components)
+    for (int y = 0; y < height / 2; y++) { // VU plane has half the height of the Y plane
+        for (int x = 0; x < width; x += 2) { // Process 2 pixels at a time (V and U)
+            // Calculate the index for the current pair of V and U components
+            int vu_index = y * dst_stride_vu + x;
 
-    // Log the Y and UV planes before conversion
-    LOGD("Before Conversion - Y Plane (first %d values):", std::min(10, ySize));
-    for (int i = 0; i < std::min(10, ySize); i++) {
-        LOGD("%d ", nv21[i]);
-    }
-
-    LOGD("Before Conversion - UV Plane (first %d values):", std::min(10, uvSize * 2));
-    for (int i = ySize; i < ySize + std::min(10, uvSize * 2); i++) {
-        LOGD("%d ", nv21[i]);
-    }
-
-    // Swap U and V components in the interleaved plane
-    for (int i = 0; i < uvSize; i += 2) {
-        uint8_t temp = nv21[ySize + i]; // U component in NV21
-        nv21[ySize + i] = nv21[ySize + i + 1]; // U in NV12 = V in NV21
-        nv21[ySize + i + 1] = temp; // V in NV12 = U in NV21
-    }
-
-    // Log the Y and UV planes after conversion
-    LOGD("After Conversion - Y Plane (first %d values):", std::min(10, ySize));
-    for (int i = 0; i < std::min(10, ySize); i++) {
-        LOGD("%d ", nv21[i]);
-    }
-
-    LOGD("After Conversion - UV Plane (first %d values):", std::min(10, uvSize * 2));
-    for (int i = ySize; i < ySize + std::min(10, uvSize * 2); i++) {
-        LOGD("%d ", nv21[i]);
+            // Swap V and U components
+            uint8_t temp = dst_vu[vu_index]; // V component
+            dst_vu[vu_index] = dst_vu[vu_index + 1]; // V = U
+            dst_vu[vu_index + 1] = temp; // U = V
+        }
     }
 }
