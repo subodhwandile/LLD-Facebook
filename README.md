@@ -25,10 +25,11 @@ or connection invitation or a comment on their post.
 12. Members should be able to search through posts for a word.
 Extended Requirement: Write a function to find connection suggestion for a member.
 
-
 #include <jni.h>
 #include <android/hardware_buffer.h>
 #include <android/log.h>
+#include <media/NdkImage.h>
+#include <media/NdkImageReader.h>
 #include <stdint.h>
 #include <cstring>
 
@@ -43,54 +44,52 @@ Java_com_example_yourapp_NativeUtils_convertNV21ToNV12(JNIEnv* env, jobject thiz
         return;
     }
 
-    // Get AHardwareBuffer from jobject
-    AHardwareBuffer* buffer = AHardwareBuffer_fromHardwareBuffer(env, jsrcBuffer);
-    if (!buffer) {
-        LOGE("Failed to get AHardwareBuffer");
+    // Convert HardwareBuffer to AImage
+    AImage* image = nullptr;
+    if (AImage_fromHardwareBuffer(env, jsrcBuffer, &image) != AMEDIA_OK || !image) {
+        LOGE("Failed to get AImage from HardwareBuffer");
         return;
     }
 
-    // Describe buffer properties
-    AHardwareBuffer_Desc desc;
-    AHardwareBuffer_describe(buffer, &desc);
+    // Get YUV planes
+    uint8_t* yData = nullptr;
+    uint8_t* uvData = nullptr;
+    int yStride = 0, uvStride = 0;
+    int yLen = 0, uvLen = 0;
 
-    if (desc.format != AHARDWAREBUFFER_FORMAT_YCbCr_420_888) {
-        LOGE("Buffer is not in YCbCr_420_888 format, cannot proceed.");
+    // Get Y plane
+    if (AImage_getPlaneData(image, 0, &yData, &yLen) != AMEDIA_OK ||
+        AImage_getPlaneRowStride(image, 0, &yStride) != AMEDIA_OK) {
+        LOGE("Failed to get Y plane");
+        AImage_delete(image);
         return;
     }
 
-    // Lock the YUV buffer
-    AHardwareBuffer_Planes planes;
-    if (AHardwareBuffer_lockYCbCr(buffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN, -1, nullptr, &planes) != 0) {
-        LOGE("Failed to lock AHardwareBuffer");
+    // Get UV plane (NV21: interleaved VU format)
+    if (AImage_getPlaneData(image, 1, &uvData, &uvLen) != AMEDIA_OK ||
+        AImage_getPlaneRowStride(image, 1, &uvStride) != AMEDIA_OK) {
+        LOGE("Failed to get UV plane");
+        AImage_delete(image);
         return;
     }
 
-    uint8_t* yPlane = static_cast<uint8_t*>(planes.ycbcr.y);
-    uint8_t* uvPlane = static_cast<uint8_t*>(planes.ycbcr.cb);
-    uint32_t yStride = planes.ycbcr.ystride;
-    uint32_t uvStride = planes.ycbcr.cstride;
-    uint32_t chromaStep = planes.ycbcr.chroma_step;
+    int width, height;
+    AImage_getWidth(image, &width);
+    AImage_getHeight(image, &height);
 
-    if (chromaStep != 2) {
-        LOGE("Unexpected chroma step: %d. Expected 2 for NV21/NV12.", chromaStep);
-        AHardwareBuffer_unlock(buffer, nullptr);
-        return;
-    }
+    int uvHeight = height / 2;
+    int uvWidth = width / 2;
 
-    int uvHeight = desc.height / 2;
-    int uvWidth = desc.width / 2;
-
-    // Convert NV21 to NV12 (Swap U and V)
+    // Convert NV21 (YVU) to NV12 (YUV) by swapping U and V
     for (int row = 0; row < uvHeight; ++row) {
         for (int col = 0; col < uvWidth; ++col) {
-            uint8_t* vuPair = uvPlane + row * uvStride + col * 2;
+            uint8_t* vuPair = uvData + row * uvStride + col * 2;
             std::swap(vuPair[0], vuPair[1]);  // Swap V (NV21) to U (NV12)
         }
     }
 
-    // Unlock buffer after modification
-    AHardwareBuffer_unlock(buffer, nullptr);
+    // Cleanup
+    AImage_delete(image);
 }
 
 
