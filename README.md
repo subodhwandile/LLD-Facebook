@@ -25,22 +25,74 @@ or connection invitation or a comment on their post.
 12. Members should be able to search through posts for a word.
 Extended Requirement: Write a function to find connection suggestion for a member.
 
+import android.graphics.ImageFormat
+import android.media.Image
+import android.media.ImageReader
+import android.os.Handler
+import android.os.HandlerThread
+import android.util.Log
+import android.view.Surface
+import java.nio.ByteBuffer
 
-void convertNV21toNV12(uint8_t* dst_y, int dst_stride_y,
-                       uint8_t* dst_vu, int dst_stride_vu,
-                       int width, int height) {
-    // Y plane is already in the correct format, so no changes are needed.
+class PreviewFrameExtractor {
 
-    // Process the VU plane (swap U and V components)
-    for (int y = 0; y < height / 2; y++) { // VU plane has half the height of the Y plane
-        for (int x = 0; x < width; x += 2) { // Process 2 pixels at a time (V and U)
-            // Calculate the index for the current pair of V and U components
-            int vu_index = y * dst_stride_vu + x;
+    private var imageReader: ImageReader? = null
+    private val handlerThread = HandlerThread("ImageReaderThread").apply { start() }
+    private val handler = Handler(handlerThread.looper)
 
-            // Swap V and U components
-            uint8_t temp = dst_vu[vu_index]; // V component
-            dst_vu[vu_index] = dst_vu[vu_index + 1]; // V = U
-            dst_vu[vu_index + 1] = temp; // U = V
+    fun setupImageReader(width: Int, height: Int) {
+        // Create ImageReader for receiving preview frames
+        imageReader = ImageReader.newInstance(width, height, ImageFormat.YUV_420_888, 2).apply {
+            setOnImageAvailableListener({ reader ->
+                val image = reader.acquireLatestImage()
+                image?.let {
+                    extractImage(it)
+                    it.close()
+                }
+            }, handler)
         }
     }
+
+    private fun extractImage(image: Image) {
+        // Get YUV planes
+        val yBuffer = image.planes[0].buffer // Y plane
+        val uBuffer = image.planes[1].buffer // U plane
+        val vBuffer = image.planes[2].buffer // V plane
+
+        val yBytes = ByteArray(yBuffer.remaining())
+        yBuffer.get(yBytes)
+
+        Log.d("ImageReader", "Extracted preview image frame with size: ${yBytes.size}")
+    }
+
+    fun getSurface(): Surface? = imageReader?.surface
+
+    fun release() {
+        imageReader?.close()
+        handlerThread.quitSafely()
+    }
 }
+
+
+===
+
+val previewSurface = Surface(textureView.surfaceTexture) // TextureView for displaying preview
+val imageCaptureSurface = imageReader.getSurface() // Surface from ImageReader
+
+cameraDevice.createCaptureSession(
+    listOf(previewSurface, imageCaptureSurface),
+    object : CameraCaptureSession.StateCallback() {
+        override fun onConfigured(session: CameraCaptureSession) {
+            val captureRequest = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
+                addTarget(previewSurface) // Display preview
+                addTarget(imageCaptureSurface) // Capture frames
+            }
+            session.setRepeatingRequest(captureRequest.build(), null, handler)
+        }
+
+        override fun onConfigureFailed(session: CameraCaptureSession) {
+            Log.e("Camera", "Session Configuration Failed")
+        }
+    },
+    handler
+)
