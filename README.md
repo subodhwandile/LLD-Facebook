@@ -76,16 +76,19 @@ class PreviewFrameExtractor {
 
 ===
 
-val previewSurface = Surface(textureView.surfaceTexture) // TextureView for displaying preview
-val imageCaptureSurface = imageReader.getSurface() // Surface from ImageReader
+// Create an instance of PreviewFrameExtractor
+val frameExtractor = PreviewFrameExtractor().apply { setupImageReader(previewWidth, previewHeight) }
+
+val previewSurface = Surface(textureView.surfaceTexture) // Surface for displaying the preview
+val imageCaptureSurface = frameExtractor.getSurface()    // Surface for extracting image frames
 
 cameraDevice.createCaptureSession(
     listOf(previewSurface, imageCaptureSurface),
     object : CameraCaptureSession.StateCallback() {
         override fun onConfigured(session: CameraCaptureSession) {
             val captureRequest = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
-                addTarget(previewSurface) // Display preview
-                addTarget(imageCaptureSurface) // Capture frames
+                addTarget(previewSurface) // Preview on screen
+                addTarget(imageCaptureSurface!!) // Capture frames for processing
             }
             session.setRepeatingRequest(captureRequest.build(), null, handler)
         }
@@ -96,3 +99,4 @@ cameraDevice.createCaptureSession(
     },
     handler
 )
+
